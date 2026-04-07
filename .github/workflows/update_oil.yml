@@ -1,0 +1,42 @@
+name: 每週自動更新油價
+
+on:
+  schedule:
+    # 每週一 00:30 UTC+8 = 週日 16:30 UTC（中油週日中午公布，週一零時生效）
+    - cron: '30 16 * * 0'
+  workflow_dispatch:  # 允許手動觸發
+
+jobs:
+  update-oil-price:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # 允許 commit 回 repo
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Fetch oil prices
+        run: python scripts/fetch_oil.py
+
+      - name: Check for changes
+        id: changes
+        run: |
+          git diff --quiet oil_prices.json || echo "changed=true" >> $GITHUB_OUTPUT
+
+      - name: Commit and push if changed
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add oil_prices.json
+          git commit -m "自動更新油價資料 $(date '+%Y-%m-%d')"
+          git push
