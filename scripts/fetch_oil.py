@@ -68,8 +68,11 @@ def fetch_history_from_igcar():
         for date_str, price_str in blocks:
             try:
                 # 轉換日期格式
-                d = datetime.strptime(date_str, '%Y/%m/%d')
-                date_key = d.strftime('%Y-%m-%d')
+                # 中油日期格式為民國年，如 115/04/06，需轉換為西元
+                parts = date_str.split('/')
+                roc_year = int(parts[0])
+                western_year = roc_year + 1911
+                date_key = f"{western_year}-{parts[1]}-{parts[2]}"
                 price = float(price_str)
                 if 15 < price < 60:
                     prices[date_key] = price
