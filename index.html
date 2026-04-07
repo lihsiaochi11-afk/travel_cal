@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>國道交通費試算器</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#f5f2ec;--surface:#fff;--surface2:#f0ede6;--border:#ddd9cf;
+  --accent:#c8500a;--accent2:#1a6b3c;--ink:#1c1a17;--ink-mid:#5c574e;
+  --ink-light:#9c968a;--radius:10px;--shadow:0 2px 12px rgba(28,26,23,.10);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'Noto Sans TC',sans-serif;font-size:14px;line-height:1.6;min-height:100vh}
+.app{display:grid;grid-template-columns:390px 1fr;grid-template-rows:auto 1fr;min-height:100vh}
+header{grid-column:1/-1;background:var(--ink);color:#f5f2ec;padding:13px 22px;display:flex;align-items:center;gap:18px}
+header .logo{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:3px;color:var(--accent);text-transform:uppercase;white-space:nowrap}
+header h1{font-size:16px;font-weight:700}
+.oil-tag{margin-left:auto;display:flex;align-items:center;gap:9px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:5px 13px;font-size:12px}
+.oil-tag .val{font-family:'DM Mono',monospace;font-size:15px;color:#f0c040}
+.oil-tag .lbl{color:rgba(245,242,236,.55)}
+.pulse{width:7px;height:7px;border-radius:50%;background:#4ecb71;animation:pulse 2.2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+.panel{background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:16px}
+.section{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.section-head{background:var(--surface2);padding:8px 13px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--ink-light);text-transform:uppercase;border-bottom:1px solid var(--border)}
+.section-body{padding:13px}
+.addr-row{display:flex;gap:8px;align-items:flex-end;margin-bottom:9px}
+.addr-row:last-of-type{margin-bottom:0}
+.addr-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-bottom:10px}
+.dot-s{background:var(--accent2)}.dot-e{background:var(--accent)}
+.addr-field{flex:1}
+.addr-field label{display:block;font-size:11px;color:var(--ink-light);margin-bottom:4px;font-weight:500}
+.addr-field input{width:100%;border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-family:'Noto Sans TC',sans-serif;font-size:13px;color:var(--ink);background:var(--surface);outline:none;transition:border-color .18s}
+.addr-field input:focus{border-color:var(--accent)}
+.addr-field input::placeholder{color:var(--ink-light)}
+.addr-hint{font-size:10px;color:var(--ink-light);margin-top:5px}
+.route-btn{width:100%;background:var(--ink);color:#f5f2ec;border:none;border-radius:7px;padding:10px;font-family:'Noto Sans TC',sans-serif;font-size:13px;font-weight:700;cursor:pointer;margin-top:11px;transition:background .18s;display:flex;align-items:center;justify-content:center;gap:7px}
+.route-btn:hover{background:#333}
+.route-btn:disabled{opacity:.5;cursor:not-allowed}
+#route-info{display:none;background:#eef7f2;border:1px solid #b8ddc8;border-radius:7px;padding:10px 12px;margin-top:10px;gap:16px}
+#route-info.visible{display:flex}
+.ri-item{display:flex;flex-direction:column}
+.ri-lbl{font-size:10px;color:var(--ink-light)}
+.ri-val{font-family:'DM Mono',monospace;font-size:15px;color:var(--accent2);font-weight:500}
+#seg-list{display:flex;flex-direction:column;gap:8px}
+.seg-card{border:1px solid var(--border);border-radius:8px;padding:10px 12px;background:var(--surface2)}
+.seg-card-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.seg-num{font-family:'DM Mono',monospace;font-size:10px;color:var(--accent);background:rgba(200,80,10,.1);border-radius:4px;padding:1px 6px}
+.seg-km{margin-left:auto;font-family:'DM Mono',monospace;font-size:12px;color:var(--ink-mid)}
+.seg-remove{background:none;border:none;color:var(--ink-light);cursor:pointer;font-size:16px;line-height:1;padding:0 2px;transition:color .15s}
+.seg-remove:hover{color:var(--accent)}
+.seg-selects{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:6px}
+.seg-selects select{width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 24px 6px 8px;font-family:'Noto Sans TC',sans-serif;font-size:12px;color:var(--ink);background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239c968a' stroke-width='1.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 8px center;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none}
+.seg-selects select:focus{border-color:var(--accent)}
+.seg-arrow{color:var(--ink-light);font-size:14px;text-align:center}
+.add-seg{border:1.5px dashed var(--border);border-radius:8px;background:none;color:var(--ink-light);font-family:'Noto Sans TC',sans-serif;font-size:13px;padding:9px;width:100%;cursor:pointer;transition:border-color .15s,color .15s}
+.add-seg:hover{border-color:var(--accent);color:var(--accent)}
+.param-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.param-field label{display:block;font-size:11px;color:var(--ink-light);margin-bottom:4px;font-weight:500}
+.param-field input{width:100%;border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-family:'Noto Sans TC',sans-serif;font-size:13px;color:var(--ink);background:var(--surface);outline:none}
+.param-field input:focus{border-color:var(--accent)}
+.param-hint{font-size:10px;color:var(--ink-light);margin-top:3px}
+.divider{border:none;border-top:1px solid var(--border);margin:11px 0}
+.sub-label{font-size:11px;color:var(--ink-light);font-weight:600;letter-spacing:.5px;margin-bottom:9px;display:block}
+.calc-btn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:8px;padding:13px;font-family:'Noto Sans TC',sans-serif;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:.5px;transition:opacity .18s,transform .1s;box-shadow:0 3px 10px rgba(200,80,10,.3)}
+.calc-btn:hover{opacity:.9}
+.calc-btn:active{transform:scale(.99)}
+.right-col{display:flex;flex-direction:column;overflow:hidden}
+#map{flex:0 0 320px;background:#e8e4dc;position:relative}
+.map-ph{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;color:var(--ink-light);pointer-events:none;z-index:10}
+.map-ph p{font-size:13px;opacity:.6}
+#result-panel{flex:1;overflow-y:auto;padding:20px;background:var(--bg);display:none}
+#result-panel.visible{display:block}
+.result-hero{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:16px}
+.hero-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:13px;text-align:center;box-shadow:var(--shadow)}
+.hero-card .hc-lbl{font-size:10px;color:var(--ink-light);margin-bottom:4px}
+.hero-card .hc-val{font-family:'DM Mono',monospace;font-size:19px;font-weight:500;color:var(--ink)}
+.hero-card .hc-unit{font-size:10px;color:var(--ink-light);margin-top:2px}
+.result-split{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:16px}
+.per-card{background:var(--surface);border-radius:var(--radius);padding:15px 17px;box-shadow:var(--shadow);border-left:3px solid var(--accent)}
+.per-card.ret{border-left-color:var(--accent2)}
+.per-card .pc-title{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1.5px;color:var(--ink-light);text-transform:uppercase;margin-bottom:7px}
+.per-card .pc-amount{font-family:'DM Mono',monospace;font-size:32px;font-weight:500;color:var(--ink);line-height:1}
+.per-card .pc-unit{font-size:12px;color:var(--ink-light);margin-top:4px}
+.per-card .pc-pax{font-size:11px;color:var(--ink-mid);margin-top:5px}
+.roundtrip-card{background:var(--ink);color:#f5f2ec;border-radius:var(--radius);padding:13px 17px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;box-shadow:var(--shadow)}
+.roundtrip-card .rt-lbl{font-size:13px;color:rgba(245,242,236,.7)}
+.roundtrip-card .rt-note{font-size:11px;color:rgba(245,242,236,.4);margin-top:2px}
+.roundtrip-card .rt-val{font-family:'DM Mono',monospace;font-size:28px;font-weight:500;color:#f0c040}
+.roundtrip-card .rt-unit{font-size:11px;color:rgba(245,242,236,.5)}
+.breakdown-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
+.bd-head{background:var(--surface2);padding:8px 15px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:2px;color:var(--ink-light);text-transform:uppercase;border-bottom:1px solid var(--border)}
+.bd-row{display:flex;justify-content:space-between;padding:8px 15px;font-size:13px;border-bottom:1px solid var(--border);color:var(--ink-mid)}
+.bd-row:last-child{border-bottom:none}
+.bd-row .bd-val{font-family:'DM Mono',monospace;color:var(--ink);font-size:13px}
+.hwy-select-wrap{width:100%;margin-bottom:8px}
+.hwy-select-wrap select{width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 24px 6px 8px;font-family:'Noto Sans TC',sans-serif;font-size:12px;font-weight:700;color:var(--ink);background:var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239c968a' stroke-width='1.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 8px center;outline:none;cursor:pointer;appearance:none;-webkit-appearance:none}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(80px);background:#c0392b;color:#fff;padding:9px 20px;border-radius:20px;font-size:13px;z-index:9999;opacity:0;transition:transform .3s,opacity .3s;pointer-events:none}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+.spinner{display:inline-block;width:13px;height:13px;border:2px solid rgba(245,242,236,.3);border-top-color:#f5f2ec;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(max-width:768px){.app{grid-template-columns:1fr}.right-col{order:-1}#map{flex:0 0 220px}.result-hero{grid-template-columns:repeat(2,1fr)}.result-split{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+
+<header>
+  <span class="logo">TW Highway</span>
+  <h1>國道交通費試算器</h1>
+  <div class="oil-tag">
+    <span class="lbl">95無鉛</span>
+    <span class="val" id="oil-display">—</span>
+    <span class="lbl">元/公升</span>
+    <div class="pulse" id="oil-pulse" style="background:#888"></div>
+  </div>
+</header>
+
+<div class="panel">
+  <!-- Step 1 -->
+  <div class="section">
+    <div class="section-head">① 輸入起終點</div>
+    <div class="section-body">
+      <div class="addr-row">
+        <div class="addr-dot dot-s"></div>
+        <div class="addr-field">
+          <label>起點</label>
+          <input type="text" id="addr-start" placeholder="地址、縣市名，或貼上經緯度 25.033, 121.565" />
+        </div>
+      </div>
+      <div class="addr-row">
+        <div class="addr-dot dot-e"></div>
+        <div class="addr-field">
+          <label>終點</label>
+          <input type="text" id="addr-end" placeholder="地址、縣市名，或貼上經緯度 24.075, 120.541" />
+        </div>
+      </div>
+      <p class="addr-hint">💡 貼上 <b>Google Maps 經緯度</b>（右鍵地圖 → 複製座標）精度最高；輸入地址精度較低</p>
+      <button class="route-btn" id="find-route-btn" onclick="findRoute()">
+        <span id="find-btn-text">查詢路線與距離</span>
+      </button>
+      <div id="route-info">
+        <div class="ri-item"><span class="ri-lbl">行駛距離</span><span class="ri-val" id="ri-dist">—</span></div>
+        <div class="ri-item"><span class="ri-lbl">預估時間</span><span class="ri-val" id="ri-time">—</span></div>
+      </div>
+      <!-- 定位結果固定顯示 -->
+      <div id="ri-locate" style="display:none;margin-top:10px;border:1px solid var(--border);border-radius:8px;overflow:hidden;font-size:12px">
+        <div style="background:var(--surface2);padding:6px 12px;color:var(--ink-light);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:1px">定位結果</div>
+        <div style="padding:8px 12px">
+          <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px">
+            <span style="width:8px;height:8px;border-radius:50%;background:#1a6b3c;flex-shrink:0;margin-top:4px"></span>
+            <div>
+              <div style="color:var(--ink-light);font-size:10px;margin-bottom:1px">起點</div>
+              <div id="ri-start-name" style="color:var(--ink);line-height:1.4"></div>
+              <div id="ri-start-badge" style="margin-top:2px"></div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:8px">
+            <span style="width:8px;height:8px;border-radius:50%;background:#c8500a;flex-shrink:0;margin-top:4px"></span>
+            <div>
+              <div style="color:var(--ink-light);font-size:10px;margin-bottom:1px">終點</div>
+              <div id="ri-end-name" style="color:var(--ink);line-height:1.4"></div>
+              <div id="ri-end-badge" style="margin-top:2px"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="ri-acc" style="display:none;margin-top:8px;background:#fff8e1;border:1px solid #f0c040;border-radius:6px;padding:8px 11px;font-size:12px;color:#7a6000">
+        ⚠️ 起終點以<b>地址</b>定位，精度較低，建議拖曳地圖上的標記修正，或改貼 Google Maps 經緯度
+      </div>
+      <div id="usage-badge" style="display:none;margin-top:6px;font-size:11px;text-align:right;color:#9c968a"></div>
+    </div>
+  </div>
+
+  <!-- Step 2 -->
+  <div class="section">
+    <div class="section-head">② 國道路段（可手動修正）</div>
+    <div class="section-body">
+      <div id="seg-list"></div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="add-seg" onclick="addSegment()" style="flex:1">＋ 新增路段</button>
+        <button class="add-seg" onclick="resetSegments()" id="reset-seg-btn"
+          style="flex:1;border-color:var(--accent2);color:var(--accent2)" title="回復為查詢後的建議路段">
+          ↺ 還原建議
+        </button>
+      </div>
+      <p style="font-size:11px;color:var(--ink-light);margin-top:7px">查詢後距離自動帶入；跨多條國道請分段，確保計費正確</p>
+    </div>
+  </div>
+
+  <!-- Step 3 -->
+  <div class="section">
+    <div class="section-head">③ 行程參數</div>
+    <div class="section-body">
+      <div class="param-grid">
+        <div class="param-field">
+          <label>車輛輛次</label>
+          <input type="number" id="num-cars" value="1" min="1" max="20">
+        </div>
+        <div class="param-field">
+          <label>出發日期</label>
+          <input type="date" id="trip-date" onchange="fetchOilByDate(this.value)">
+          <div class="param-hint">選擇日期後自動查詢當週油價</div>
+        </div>
+        <div class="param-field">
+          <label>95無鉛油價（元/公升）</label>
+          <input type="number" id="manual-oil" placeholder="查詢中…" step="0.1" min="0">
+          <div class="param-hint" id="oil-src-hint">選擇日期後自動帶入，可手動修改</div>
+        </div>
+      </div>
+      <hr class="divider">
+      <span class="sub-label">▸ 去程</span>
+      <div class="param-grid">
+        <div class="param-field">
+          <label>乘客人數（不含駕駛）</label>
+          <input type="number" id="go-pax" value="1" min="0" max="8">
+          <div class="param-hint">費用由乘客均攤，駕駛不分攤</div>
+        </div>
+      </div>
+      <hr class="divider">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <input type="checkbox" id="has-return" onchange="toggleReturn(this.checked)"
+          style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer;flex-shrink:0">
+        <label for="has-return" style="font-size:13px;font-weight:600;cursor:pointer;color:var(--ink)">需要計算回程</label>
+      </div>
+      <div id="return-section" style="display:none">
+        <span class="sub-label">▸ 回程</span>
+        <div class="param-grid">
+          <div class="param-field">
+            <label>乘客人數（不含駕駛）</label>
+            <input type="number" id="return-pax" value="1" min="0" max="8">
+            <div class="param-hint">費用由乘客均攤，駕駛不分攤</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button class="calc-btn" onclick="calculate()">計算費用分攤</button>
+</div>
+
+<div class="right-col">
+  <div id="map">
+    <div class="map-ph" id="map-ph">
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".35">
+        <path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3V6z"/><path d="M9 3v15M15 6v15"/>
+      </svg>
+      <p>輸入起終點後查詢路線</p>
+    </div>
+  </div>
+
+  <div id="result-panel">
+    <!-- 計算條件摘要 -->
+    <div id="r-params" style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:16px;box-shadow:var(--shadow)">
+      <div style="display:flex;align-items:center;gap:6px;font-size:13px">
+        <span style="color:var(--ink-light)">🚗 車輛</span>
+        <span id="rp-cars" style="font-family:'DM Mono',monospace;font-weight:600;color:var(--ink)">—</span>
+        <span style="color:var(--ink-light)">輛</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:13px">
+        <span style="color:var(--ink-light)">⛽ 油價</span>
+        <span id="rp-oil" style="font-family:'DM Mono',monospace;font-weight:600;color:var(--ink)">—</span>
+        <span style="color:var(--ink-light)">元/公升</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:13px">
+        <span style="color:var(--accent2)">▸ 去程乘客</span>
+        <span id="rp-go" style="font-family:'DM Mono',monospace;font-weight:600;color:var(--ink)">—</span>
+        <span style="color:var(--ink-light)">人</span>
+      </div>
+      <div id="rp-ret-wrap" style="display:none;align-items:center;gap:6px;font-size:13px">
+        <span style="color:var(--accent)">◂ 回程乘客</span>
+        <span id="rp-ret" style="font-family:'DM Mono',monospace;font-weight:600;color:var(--ink)">—</span>
+        <span style="color:var(--ink-light)">人</span>
+      </div>
+    </div>
+    <div class="result-hero">
+      <div class="hero-card"><div class="hc-lbl">行駛距離</div><div class="hc-val" id="r-dist">—</div><div class="hc-unit">公里</div></div>
+      <div class="hero-card"><div class="hc-lbl">油費小計</div><div class="hc-val" id="r-fuel">—</div><div class="hc-unit">元</div></div>
+      <div class="hero-card"><div class="hc-lbl">eTag通行費</div><div class="hc-val" id="r-toll">—</div><div class="hc-unit">元</div></div>
+      <div class="hero-card"><div class="hc-lbl">單程合計</div><div class="hc-val" id="r-oneway">—</div><div class="hc-unit">元</div></div>
+    </div>
+    <div class="result-split">
+      <div class="per-card">
+        <div class="pc-title">去程 · 每人分攤</div>
+        <div class="pc-amount" id="r-go-per">—</div>
+        <div class="pc-unit">元</div>
+
+      </div>
+      <div class="per-card ret" id="r-ret-card" style="display:none">
+        <div class="pc-title">回程 · 每人分攤</div>
+        <div class="pc-amount" id="r-ret-per">—</div>
+        <div class="pc-unit">元</div>
+
+      </div>
+    </div>
+    <div class="roundtrip-card" id="r-roundtrip-card" style="display:none">
+      <div>
+        <div class="rt-lbl">來回合計每人</div>
+        <div class="rt-note" id="r-rt-note"></div>
+      </div>
+      <div><span class="rt-val" id="r-roundtrip">—</span><span class="rt-unit"> 元</span></div>
+    </div>
+    <div class="breakdown-card">
+      <div class="bd-head">計算明細</div>
+      <div id="bd-content"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── HWY DATA ──────────────────────────────────────────────
+const HWY = {
+  N1:{label:"國道1號（中山高）",entries:[
+    {n:"基隆端",km:0},{n:"基隆",km:1},{n:"八堵",km:2},{n:"大華系統",km:5},
+    {n:"五堵",km:6},{n:"汐止",km:10},{n:"汐止系統",km:11},{n:"高架汐止端",km:12},
+    {n:"東湖",km:15},{n:"內湖",km:16},{n:"圓山",km:23},{n:"台北",km:25},
+    {n:"三重",km:27},{n:"五股系統",km:33},{n:"林口",km:41},{n:"桃園",km:49},
+    {n:"機場系統",km:52},{n:"內壢",km:57},{n:"中壢",km:62},{n:"平鎮系統",km:65},
+    {n:"楊梅",km:69},{n:"湖口",km:83},{n:"竹北",km:91},{n:"新竹",km:95},
+    {n:"新竹系統",km:99},{n:"頭份",km:110},{n:"苗栗",km:132},{n:"三義",km:150},
+    {n:"后里",km:160},{n:"台中系統",km:165},{n:"豐原",km:168},{n:"大雅",km:174},
+    {n:"台中",km:178},{n:"南屯",km:181},{n:"王田",km:189},{n:"彰化系統",km:192},
+    {n:"彰化",km:198},{n:"埔鹽系統",km:207},{n:"員林",km:211},{n:"北斗",km:220},
+    {n:"西螺",km:230},{n:"斗南",km:240},{n:"雲林系統",km:243},{n:"大林",km:250},
+    {n:"嘉義",km:264},{n:"水上",km:270},{n:"嘉義系統",km:272},{n:"新營",km:288},
+    {n:"麻豆",km:303},{n:"安定",km:311},{n:"台南系統",km:315},{n:"永康",km:319},
+    {n:"台南",km:327},{n:"仁德系統",km:330},{n:"路竹",km:338},{n:"岡山",km:349},
+    {n:"楠梓",km:356},{n:"鼎金系統",km:362},{n:"高雄",km:367},
+    {n:"五甲系統",km:370},{n:"高雄端",km:372}
+  ]},
+  N3:{label:"國道3號（福爾摩沙）",entries:[
+    {n:"基金端",km:0},{n:"瑪東系統",km:2},{n:"汐止系統",km:10},
+    {n:"新台五路",km:12},{n:"南港",km:15},{n:"南港系統",km:16},
+    {n:"木柵",km:20},{n:"新店",km:26},{n:"安坑",km:31},
+    {n:"中和",km:35},{n:"土城",km:43},{n:"三鶯",km:50},
+    {n:"鶯歌系統",km:54},{n:"大溪",km:62},{n:"龍潭",km:68},
+    {n:"關西",km:79},{n:"竹林",km:90},{n:"寶山",km:98},
+    {n:"新竹系統",km:100},{n:"茄苳",km:103},{n:"香山",km:109},
+    {n:"西濱",km:115},{n:"竹南",km:119},{n:"大山",km:124},
+    {n:"後龍",km:130},{n:"通霄",km:144},{n:"苑裡",km:156},
+    {n:"大甲",km:164},{n:"中港系統",km:169},{n:"沙鹿",km:176},
+    {n:"龍井",km:182},{n:"和美",km:191},{n:"彰化系統",km:196},
+    {n:"快官",km:202},{n:"烏日",km:207},{n:"中投",km:209},
+    {n:"霧峰",km:211},{n:"霧峰系統",km:214},{n:"草屯",km:217},
+    {n:"中興系統",km:222},{n:"南投",km:224},{n:"名間",km:236},
+    {n:"竹山",km:243},{n:"斗六",km:260},{n:"古坑系統",km:269},
+    {n:"梅山",km:279},{n:"竹崎",km:290},{n:"中埔",km:297},
+    {n:"水上系統",km:300},{n:"白河",km:311},{n:"烏山頭",km:329},
+    {n:"官田系統",km:334},{n:"善化",km:340},{n:"新化系統",km:346},
+    {n:"關廟",km:357},{n:"田寮",km:369},{n:"燕巢系統",km:383},
+    {n:"高雄端",km:391}
+  ]},
+  N5:{label:"國道5號（北宜高）",entries:[
+    {n:"南港系統",km:0},{n:"石碇",km:4},{n:"坪林",km:15},
+    {n:"頭城",km:30},{n:"宜蘭",km:38},{n:"羅東",km:46},{n:"蘇澳",km:54}
+  ]},
+  N2:{label:"國道2號（桃園環線）",entries:[
+    {n:"五股系統",km:0},{n:"大渡",km:6.3},{n:"桃園系統",km:12.8},
+    {n:"龜山",km:15.4},{n:"機場系統",km:20.6},{n:"大園",km:24.1},
+    {n:"觀音",km:30.7},{n:"新屋",km:38.2},{n:"中壢系統",km:47.5}
+  ]},
+  N3A:{label:"國道3甲（基金公路）",entries:[
+    {n:"深坑系統",km:0},{n:"木柵系統",km:5.2},{n:"台北（辛亥）",km:8.7}
+  ]}
+};
+
+// ── LOCATION FALLBACK TABLE ───────────────────────────────
+// 注意：normalize() 會把「臺」轉成「台」再查表，不需重複列
+const LOC = {
+  '台北':      [25.0330,121.5654],'台北市':    [25.0330,121.5654],
+  '台北車站':  [25.0478,121.5170],'台北火車站':[25.0478,121.5170],
+  '基隆':      [25.1276,121.7392],'基隆市':    [25.1276,121.7392],
+  '板橋':      [25.0143,121.4637],'新店':      [24.9718,121.5384],
+  '中和':      [25.0000,121.4894],'永和':      [25.0111,121.5141],
+  '三重':      [25.0611,121.4875],'新莊':      [25.0351,121.4497],
+  '樹林':      [24.9914,121.4236],'土城':      [24.9747,121.4439],
+  '新北市':    [25.0121,121.4659],
+  '宜蘭':      [24.7021,121.7377],'宜蘭市':    [24.7021,121.7377],
+  '宜蘭縣':    [24.7021,121.7377],'羅東':      [24.6773,121.7569],
+  '桃園':      [24.9936,121.3010],'桃園市':    [24.9936,121.3010],
+  '中壢':      [24.9638,121.2253],'新竹':      [24.8066,120.9686],
+  '新竹市':    [24.8066,120.9686],'新竹縣':    [24.8066,120.9686],
+  '竹北':      [24.8394,121.0045],'苗栗':      [24.5600,120.8214],
+  '苗栗市':    [24.5600,120.8214],'苗栗縣':    [24.5600,120.8214],
+  '台中':      [24.1477,120.6736],'台中市':    [24.1477,120.6736],
+  '豐原':      [24.2530,120.7186],'烏日':      [24.0878,120.6461],
+  '彰化':      [24.0752,120.5418],'彰化市':    [24.0752,120.5418],
+  '彰化縣':    [24.0752,120.5418],'員林':      [23.9583,120.5742],
+  '南投':      [23.9167,120.6833],'南投市':    [23.9167,120.6833],
+  '南投縣':    [23.9167,120.6833],'草屯':      [23.9782,120.6679],
+  '斗六':      [23.7071,120.5431],'雲林':      [23.7579,120.4300],
+  '雲林縣':    [23.7579,120.4300],'嘉義':      [23.4800,120.4491],
+  '嘉義市':    [23.4800,120.4491],'嘉義縣':    [23.4800,120.4491],
+  '新營':      [23.3064,120.3147],'台南':      [22.9999,120.2270],
+  '台南市':    [22.9999,120.2270],'善化':      [23.1484,120.3047],
+  '永康':      [23.0333,120.2667],'台南高鐵站':[22.9281,120.2981],
+  '高雄':      [22.6273,120.3014],'高雄市':    [22.6273,120.3014],
+  '岡山':      [22.7963,120.2953],'左營':      [22.6867,120.2958],
+  '屏東':      [22.6762,120.4942],'屏東市':    [22.6762,120.4942],
+  '屏東縣':    [22.6762,120.4942],'花蓮':      [23.9769,121.6044],
+  '花蓮市':    [23.9769,121.6044],'花蓮縣':    [23.9769,121.6044],
+  '台東':      [22.7583,121.1444],'台東市':    [22.7583,121.1444],
+  '台東縣':    [22.7583,121.1444]
+};
+
+// ── MAP ───────────────────────────────────────────────────
+let map=null, routeLayer=null, markerStart=null, markerEnd=null;
+let osrmKm=null;
+
+function loadLeaflet(cb){
+  if(window.L){cb();return;}
+  const s=document.createElement('script');
+  s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+  s.onload=cb;
+  s.onerror=()=>showToast('地圖套件載入失敗，請重新整理');
+  document.head.appendChild(s);
+}
+function initMap(){
+  if(map) return;
+  map=L.map('map',{center:[23.8,121.0],zoom:7,zoomControl:true});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© OpenStreetMap contributors',maxZoom:18
+  }).addTo(map);
+}
+function clearMap(){
+  if(routeLayer){map.removeLayer(routeLayer);routeLayer=null;}
+  if(markerStart){map.removeLayer(markerStart);markerStart=null;}
+  if(markerEnd){map.removeLayer(markerEnd);markerEnd=null;}
+}
+
+// ── GEOCODE (多重備援) ────────────────────────────────────
+
+// 正規化：臺→台、去除門牌號碼、去除多餘空白
+function normalize(q){
+  return q.trim()
+    .replace(/臺/g,'台')
+    .replace(/　/g,' ')
+    .replace(/\s+/g,' ')
+    .replace(/(\d+)\s*號.*$/,'')   // 去掉「60號」及之後（樓層等）
+    .replace(/(\d+)\s*樓.*$/,'')   // 去掉「3樓」及之後
+    .trim();
+}
+
+function lookupLocal(q){
+  // 只要輸入包含區/路/街等詳細資訊，一律走 Nominatim 不用本地表
+  const hasDetail = /[區鄉鎮村里路街道巷弄號樓]/.test(q);
+  if(hasDetail) return null;
+  // 純縣市/城鎮名 → 完全符合才用本地表
+  if(LOC[q]) return {lat:LOC[q][0],lon:LOC[q][1],name:q};
+  return null;
+}
+
+// 解析地址成結構化欄位送給Nominatim，精確度遠高於自由文字查詢
+function parseAddr(q){
+  // 嘗試拆出縣市 / 區 / 路街
+  const cityMatch = q.match(/^(.*?[縣市])/);
+  const distMatch = q.match(/[縣市](.*?[鄉鎮市區])/);
+  const roadMatch = q.match(/[鄉鎮市區](.*)/);
+  return {
+    city:  cityMatch  ? cityMatch[1]  : null,
+    dist:  distMatch  ? distMatch[1]  : null,
+    road:  roadMatch  ? roadMatch[1].trim() : null,
+    raw:   q
+  };
+}
+
+async function nominatim(q){
+  const addr = parseAddr(q);
+
+  // 建立從精確到模糊的查詢序列
+  const strategies = [];
+
+  if(addr.city && addr.dist && addr.road){
+    // 1. 完整路址 structured
+    strategies.push(
+      `https://nominatim.openstreetmap.org/search?format=json&countrycodes=tw&limit=3&accept-language=zh-TW` +
+      `&street=${encodeURIComponent(addr.road)}` +
+      `&city=${encodeURIComponent(addr.city)}`
+    );
+    // 2. 縣市+區+路 自由文字
+    strategies.push(
+      `https://nominatim.openstreetmap.org/search?format=json&countrycodes=tw&limit=3&accept-language=zh-TW` +
+      `&q=${encodeURIComponent(addr.dist+addr.road+', '+addr.city+', 台灣')}`
+    );
+    // 3. 退一層：只給縣市+區（捨棄路名）
+    strategies.push(
+      `https://nominatim.openstreetmap.org/search?format=json&countrycodes=tw&limit=3&accept-language=zh-TW` +
+      `&q=${encodeURIComponent(addr.city+addr.dist+', 台灣')}`
+    );
+  } else if(addr.city && addr.dist){
+    // 有縣市+區
+    strategies.push(
+      `https://nominatim.openstreetmap.org/search?format=json&countrycodes=tw&limit=3&accept-language=zh-TW` +
+      `&q=${encodeURIComponent(addr.city+addr.dist+', 台灣')}`
+    );
+    // 退一層：只給縣市
+    strategies.push(
+      `https://nominatim.openstreetmap.org/search?format=json&countrycodes=tw&limit=3&accept-language=zh-TW` +
+      `&q=${encodeURIComponent(addr.city+', 台灣')}`
+    );
+  }
+
+  // 最後：整串自由文字
+  strategies.push(
+    `https://nominatim.openstreetmap.org/search?format=json&countrycodes=tw&limit=3&accept-language=zh-TW` +
+    `&q=${encodeURIComponent(q+', 台灣')}`
+  );
+
+  for(const url of strategies){
+    try{
+      const res = await fetch(url, {headers:{'Accept-Language':'zh-TW'}});
+      const data = await res.json();
+      if(data.length){
+        const best = data.find(d=>['road','residential','living_street','secondary','tertiary'].includes(d.type))
+                  || data[0];
+        return {
+          lat: parseFloat(best.lat),
+          lon: parseFloat(best.lon),
+          name: best.display_name.split(',').slice(0,2).join(',')
+        };
+      }
+    }catch(_){}
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════
+// GOOGLE GEOCODING — 填入你的 API Key
+// ═══════════════════════════════════════════
+const GOOGLE_API_KEY = 'YOUR_API_KEY_HERE'; // ← 填入 API Key
+
+// 每日用量控制
+const DAILY_LIMIT  = 50;  // 每日最多幾次 Google Geocoding
+const WARN_AT      = 40;  // 幾次時開始警告
+
+function getTodayKey(){ return 'gc_'+new Date().toISOString().slice(0,10); }
+
+function getUsage(){
+  try{
+    const k = getTodayKey();
+    return parseInt(localStorage.getItem(k)||'0');
+  }catch(_){ return 0; }
+}
+
+function incrementUsage(){
+  try{
+    const k = getTodayKey();
+    const v = getUsage()+1;
+    localStorage.setItem(k, v);
+    // 清除昨天以前的舊資料
+    for(const key of Object.keys(localStorage)){
+      if(key.startsWith('gc_') && key!==k) localStorage.removeItem(key);
+    }
+    return v;
+  }catch(_){ return 0; }
+}
+
+function showUsageBadge(used){
+  let el = document.getElementById('usage-badge');
+  if(!el) return;
+  el.textContent = `Google Geocoding 今日已用 ${used}/${DAILY_LIMIT} 次`;
+  el.style.display = 'block';
+  el.style.color = used >= WARN_AT ? '#c8500a' : '#7a8099';
+}
+
+// Google Geocoding API
+async function googleGeocode(q){
+  if(!GOOGLE_API_KEY || GOOGLE_API_KEY === 'YOUR_API_KEY_HERE') return null;
+
+  const used = getUsage();
+  if(used >= DAILY_LIMIT){
+    showToast('今日 Google 定位已達上限，改用一般地址搜尋（精度較低）');
+    return null;
+  }
+
+  try{
+    const url = `https://maps.googleapis.com/maps/api/geocode/json`+
+                `?address=${encodeURIComponent(q+', 台灣')}`+
+                `&language=zh-TW&region=TW&key=${GOOGLE_API_KEY}`;
+    const res  = await fetch(url);
+    const data = await res.json();
+
+    if(data.status === 'OK' && data.results.length){
+      const r   = data.results[0];
+      const loc = r.geometry.location;
+      const newUsed = incrementUsage();
+      showUsageBadge(newUsed);
+      if(newUsed >= WARN_AT){
+        showToast(`⚠️ Google 定位今日已用 ${newUsed}/${DAILY_LIMIT} 次，接近上限`);
+      }
+      return {
+        lat: loc.lat, lon: loc.lng,
+        name: r.formatted_address,
+        isCoord: true   // Google 精度視為高精度
+      };
+    }
+    // API Key 有效但查無結果
+    if(data.status === 'ZERO_RESULTS') return null;
+    // Key 錯誤或超額
+    if(data.status === 'REQUEST_DENIED' || data.status === 'OVER_QUERY_LIMIT'){
+      showToast('Google API Key 錯誤或已超出額度，改用一般搜尋');
+      return null;
+    }
+  }catch(_){ return null; }
+  return null;
+}
+
+// 判斷是否為經緯度格式
+function parseLatLon(q){
+  const clean = q.replace(/[NnEeSsWw°]/g,'').trim();
+  const m = clean.match(/^(-?[0-9]+\.?[0-9]*)[,\s]+(-?[0-9]+\.?[0-9]*)$/);
+  if(!m) return null;
+  const lat = parseFloat(m[1]);
+  const lon = parseFloat(m[2]);
+  if(lat<21||lat>26||lon<119||lon>123) return null;
+  return {lat, lon, name:`${lat.toFixed(5)}, ${lon.toFixed(5)}`, isCoord:true};
+}
+
+async function geocode(q){
+  q = normalize(q);
+  // 0. 經緯度格式 → 直接使用，最高精度
+  const coord = parseLatLon(q);
+  if(coord) return coord;
+  // 1. 純縣市/城鎮名 → 本地表（不耗 API 額度）
+  const local = lookupLocal(q);
+  if(local) return {...local, isCoord:false};
+  // 2. Google Geocoding（有填 Key 且未超限）
+  const gg = await googleGeocode(q);
+  if(gg) return gg;
+  // 3. Nominatim 備援
+  const nm = await nominatim(q);
+  if(nm) return {...nm, isCoord:false};
+  // 4. 找不到
+  throw new Error(`找不到「${q}」，建議改貼 Google Maps 經緯度（右鍵地圖 → 複製座標）`);
+}
+
+// ── OSRM ─────────────────────────────────────────────────
+async function getRoute(s,e){
+  const url=`https://router.project-osrm.org/route/v1/driving/${s.lon},${s.lat};${e.lon},${e.lat}?overview=full&geometries=geojson`;
+  const res=await fetch(url);
+  const data=await res.json();
+  if(data.code!=='Ok') throw new Error('路線規劃失敗，請再試一次');
+  return data.routes[0];
+}
+
+// ── FIND ROUTE ────────────────────────────────────────────
+async function findRoute(){
+  const sa=document.getElementById('addr-start').value.trim();
+  const ea=document.getElementById('addr-end').value.trim();
+  if(!sa||!ea){showToast('請輸入起點與終點地址');return;}
+
+  const btn=document.getElementById('find-route-btn');
+  const btnTxt=document.getElementById('find-btn-text');
+  btn.disabled=true;
+  btnTxt.innerHTML='<span class="spinner"></span> 查詢中…';
+
+  try{
+    const [start,end]=await Promise.all([geocode(sa),geocode(ea)]);
+    const route=await getRoute(start,end);
+    const distKm=(route.distance/1000).toFixed(1);
+    const durMin=Math.round(route.duration/60);
+    osrmKm=parseFloat(distKm);
+
+    // Map
+    loadLeaflet(()=>{
+      initMap();
+      clearMap();
+      document.getElementById('map-ph').style.display='none';
+
+      const mkIcon=(color,label)=>L.divIcon({
+        html:`<div style="position:relative">
+          <div style="width:16px;height:16px;background:${color};border:2.5px solid white;border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,.35);cursor:grab"></div>
+          <div style="position:absolute;top:-22px;left:50%;transform:translateX(-50%);background:${color};color:white;font-size:10px;font-family:sans-serif;padding:2px 6px;border-radius:4px;white-space:nowrap">${label}</div>
+        </div>`,
+        className:'',iconAnchor:[8,8]
+      });
+
+      markerStart=L.marker([start.lat,start.lon],{icon:mkIcon('#1a6b3c','起點'),draggable:true})
+        .addTo(map).bindPopup('<b>起點</b><br>拖曳可調整位置');
+      markerEnd=L.marker([end.lat,end.lon],{icon:mkIcon('#c8500a','終點'),draggable:true})
+        .addTo(map).bindPopup('<b>終點</b><br>拖曳可調整位置');
+
+      routeLayer=L.geoJSON(route.geometry,{style:{color:'#c8500a',weight:4,opacity:.8}}).addTo(map);
+      map.fitBounds(routeLayer.getBounds(),{padding:[28,28]});
+
+      async function redraw(){
+        const s=markerStart.getLatLng();
+        const e=markerEnd.getLatLng();
+        try{
+          const r=await getRoute({lat:s.lat,lon:s.lng},{lat:e.lat,lon:e.lng});
+          const km=(r.distance/1000).toFixed(1);
+          const dur=Math.round(r.duration/60);
+          osrmKm=parseFloat(km);
+          if(routeLayer){map.removeLayer(routeLayer);}
+          routeLayer=L.geoJSON(r.geometry,{style:{color:'#c8500a',weight:4,opacity:.8}}).addTo(map);
+          document.getElementById('ri-dist').textContent=km+' km';
+          document.getElementById('ri-time').textContent=
+            dur>=60?`${Math.floor(dur/60)}h${dur%60}m`:`${dur} min`;
+          const sLL=markerStart.getLatLng(), eLL=markerEnd.getLatLng();
+          autoSuggest(osrmKm, {lat:sLL.lat,lon:sLL.lng}, {lat:eLL.lat,lon:eLL.lng});
+          showToast('已更新路線，距離 '+km+' km',true);
+        }catch(_){showToast('路線更新失敗，請再試');}
+      }
+
+      markerStart.on('dragend',redraw);
+      markerEnd.on('dragend',redraw);
+    });
+
+    // Route info
+    document.getElementById('ri-dist').textContent=distKm+' km';
+    document.getElementById('ri-time').textContent=
+      durMin>=60?`${Math.floor(durMin/60)}h${durMin%60}m`:`${durMin} min`;
+    document.getElementById('route-info').classList.add('visible');
+
+    // Auto-suggest segment
+    autoSuggest(osrmKm, start, end);
+    document.getElementById('reset-seg-btn').style.opacity='1';
+    // 更新固定的定位結果顯示
+    function renderLocateBadge(isCoord){
+      if(isCoord) return '<span style="background:#eef7f2;color:#1a6b3c;border:1px solid #b8ddc8;border-radius:4px;padding:1px 6px;font-size:10px">📍 精確定位</span>';
+      return '<span style="background:#fff8e1;color:#7a6000;border:1px solid #f0c040;border-radius:4px;padding:1px 6px;font-size:10px">⚠️ 地址估算，可拖曳標記修正</span>';
+    }
+    document.getElementById('ri-start-name').textContent = start.name.split(',').slice(0,2).join(', ');
+    document.getElementById('ri-start-badge').innerHTML = renderLocateBadge(start.isCoord);
+    document.getElementById('ri-end-name').textContent = end.name.split(',').slice(0,2).join(', ');
+    document.getElementById('ri-end-badge').innerHTML = renderLocateBadge(end.isCoord);
+    document.getElementById('ri-locate').style.display = 'block';
+
+    // 若有任一端用地址定位，顯示精度警告
+    const lowAcc = !start.isCoord || !end.isCoord;
+    const accEl = document.getElementById('ri-acc');
+    if(accEl) accEl.style.display = lowAcc ? 'block' : 'none';
+
+  }catch(e){
+    showToast(e.message||'查詢失敗');
+  }finally{
+    btn.disabled=false;
+    btnTxt.textContent='重新查詢路線';
+  }
+}
+
+// ── SEGMENTS ──────────────────────────────────────────────
+let segments=[];
+
+// ── 交流道經緯度資料庫 ──────────────────────────────────────
+const IC = {
+  N1:[
+    // 基隆端,基隆,八堵,大華系統,五堵,汐止,汐止系統,高架汐止端
+    {lat:25.09996,lon:121.70852},{lat:25.09996,lon:121.70852},{lat:25.06500,lon:121.68300},
+    {lat:25.07400,lon:121.65900},{lat:25.06800,lon:121.65100},{lat:25.07344,lon:121.64945},
+    {lat:25.06161,lon:121.63972},{lat:25.06800,lon:121.64500},
+    // 東湖,內湖,圓山,台北,三重,五股系統,林口,桃園
+    {lat:25.06600,lon:121.60100},{lat:25.06476,lon:121.59061},{lat:25.06901,lon:121.53328},
+    {lat:25.08271,lon:121.51184},{lat:25.07466,lon:121.49435},{lat:25.08483,lon:121.43866},
+    {lat:25.06242,lon:121.35423},{lat:25.01311,lon:121.26641},
+    // 機場系統,內壢,中壢,平鎮系統,楊梅,湖口
+    {lat:25.07600,lon:121.22800},{lat:24.97800,lon:121.22000},{lat:24.96380,lon:121.22530},
+    {lat:24.93200,lon:121.19800},{lat:24.91140,lon:121.16523},{lat:24.88145,lon:121.04498},
+    // 竹北,新竹,新竹系統,頭份,苗栗,三義
+    {lat:24.83940,lon:121.00450},{lat:24.77857,lon:121.00319},{lat:24.81383,lon:120.96748},
+    {lat:24.69197,lon:120.91420},{lat:24.52053,lon:120.82149},{lat:24.38926,lon:120.76948},
+    // 后里,台中系統,豐原,大雅,台中,南屯,王田
+    {lat:24.31191,lon:120.70448},{lat:24.27074,lon:120.69239},{lat:24.25212,lon:120.72348},
+    {lat:24.20800,lon:120.64800},{lat:24.15370,lon:120.61720},{lat:24.11500,lon:120.62000},
+    {lat:24.06200,lon:120.61800},
+    // 彰化系統,彰化,埔鹽系統,員林,北斗,西螺
+    {lat:24.05180,lon:120.51614},{lat:24.06978,lon:120.52792},{lat:23.99200,lon:120.56800},
+    {lat:23.95957,lon:120.58547},{lat:23.88078,lon:120.49781},{lat:23.77592,lon:120.47865},
+    // 斗南,雲林系統,大林,嘉義,水上,嘉義系統
+    {lat:23.69380,lon:120.46745},{lat:23.65000,lon:120.47200},{lat:23.56000,lon:120.46000},
+    {lat:23.49301,lon:120.39540},{lat:23.44634,lon:120.36243},{lat:23.45200,lon:120.38100},
+    // 新營,麻豆,安定,台南系統,永康,台南
+    {lat:23.31196,lon:120.30895},{lat:23.17928,lon:120.23011},{lat:23.10500,lon:120.24500},
+    {lat:22.99948,lon:120.22927},{lat:23.04195,lon:120.24837},{lat:22.97219,lon:120.24977},
+    // 仁德系統,路竹,岡山,楠梓,鼎金系統,高雄,五甲系統,高雄端
+    {lat:22.93963,lon:120.25554},{lat:22.84940,lon:120.26281},{lat:22.78730,lon:120.31867},
+    {lat:22.72213,lon:120.33116},{lat:22.67522,lon:120.32899},{lat:22.65459,lon:120.31952},
+    {lat:22.61800,lon:120.34100},{lat:22.65991,lon:120.33136}
+  ],
+  N3:[
+    {lat:25.11207,lon:121.68643},{lat:25.11207,lon:121.68643},{lat:25.06161,lon:121.63972},
+    {lat:25.05500,lon:121.61200},{lat:24.99168,lon:121.57113},{lat:24.97189,lon:121.54761},
+    {lat:24.96436,lon:121.51746},{lat:24.99472,lon:121.48547},{lat:24.96837,lon:121.43803},
+    {lat:24.96581,lon:121.43203},{lat:24.98156,lon:121.41986},{lat:24.91200,lon:121.35800},
+    {lat:24.96596,lon:121.32825},{lat:24.88819,lon:121.27011},{lat:24.80449,lon:121.14813},
+    {lat:24.80449,lon:121.14813},{lat:24.81383,lon:120.96748},{lat:24.73712,lon:120.91216},
+    {lat:24.70092,lon:120.87860},{lat:24.59433,lon:120.79052},{lat:24.56016,lon:120.82143},
+    {lat:24.62481,lon:120.86138},{lat:24.25212,lon:120.72348},{lat:24.04432,lon:120.73500},
+    {lat:24.05177,lon:120.68972},{lat:24.00115,lon:120.72129},{lat:23.96100,lon:120.68600},
+    {lat:23.94915,lon:120.67083},{lat:23.85378,lon:120.67751},{lat:23.79553,lon:120.70782},
+    {lat:23.73102,lon:120.59318},{lat:23.64498,lon:120.56374},{lat:23.64498,lon:120.56374},
+    {lat:24.05180,lon:120.51614}, // 彰化系統
+    {lat:23.57500,lon:120.58300},{lat:23.45200,lon:120.38100},{lat:23.44424,lon:120.50672},
+    {lat:23.41192,lon:120.30798},{lat:23.34520,lon:120.42878},{lat:23.31196,lon:120.30895},
+    {lat:23.17634,lon:120.23973},{lat:23.14026,lon:120.30895},{lat:22.96371,lon:120.33202},
+    {lat:22.97407,lon:120.32030},{lat:22.86335,lon:120.40119},{lat:22.78237,lon:120.37814},
+    {lat:22.67522,lon:120.32899},{lat:22.83190,lon:120.40797}
+  ],
+  N5:[
+    {lat:25.05500,lon:121.61200},{lat:25.00883,lon:121.64789},{lat:24.93508,lon:121.71076},
+    {lat:24.83624,lon:121.79142},{lat:24.82142,lon:121.76970},{lat:24.70211,lon:121.73775},
+    {lat:24.66965,lon:121.79652}
+  ],
+  N2:[
+    {lat:25.08483,lon:121.43866},{lat:25.07800,lon:121.37200},{lat:24.99363,lon:121.30098},
+    {lat:25.03500,lon:121.34600},{lat:25.07600,lon:121.22800},{lat:25.05723,lon:121.21580},
+    {lat:25.02954,lon:121.05340},{lat:24.95753,lon:121.19490},{lat:25.01119,lon:121.27933}
+  ]
+};
+
+// 計算兩點距離（km，Haversine）
+function haversine(lat1,lon1,lat2,lon2){
+  const R=6371, dLat=(lat2-lat1)*Math.PI/180, dLon=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+
+// 找最近的交流道 index
+function nearestIC(hwyKey, lat, lon){
+  const coords = IC[hwyKey];
+  if(!coords) return 0;
+  let best=0, bestD=Infinity;
+  coords.forEach((c,i)=>{
+    if(!c.lat) return;
+    const d=haversine(lat,lon,c.lat,c.lon);
+    if(d<bestD){bestD=d;best=i;}
+  });
+  return best;
+}
+
+// 儲存最後一次 autoSuggest 的參數，供還原使用
+let lastSuggestArgs = null;
+
+function resetSegments(){
+  if(!lastSuggestArgs){
+    showToast('請先查詢路線');
+    return;
+  }
+  autoSuggest(...lastSuggestArgs);
+  showToast('已還原為建議路段', true);
+}
+
+function autoSuggest(totalKm, startCoord, endCoord){
+  lastSuggestArgs = [totalKm, startCoord, endCoord];
+  segments=[];
+
+  // 如果有起終點座標，用座標比對找最近交流道
+  if(startCoord && endCoord){
+    // 判斷走哪條國道：比較起點到各國道最近交流道的距離
+    let bestHwy='N1', bestDist=Infinity;
+    for(const hwyKey of ['N1','N3','N5','N2']){
+      const si=nearestIC(hwyKey,startCoord.lat,startCoord.lon);
+      const ei=nearestIC(hwyKey,endCoord.lat,endCoord.lon);
+      const coords=IC[hwyKey];
+      if(!coords[si]?.lat||!coords[ei]?.lat) continue;
+      const dStart=haversine(startCoord.lat,startCoord.lon,coords[si].lat,coords[si].lon);
+      const dEnd=haversine(endCoord.lat,endCoord.lon,coords[ei].lat,coords[ei].lon);
+      const totalD=dStart+dEnd;
+      if(totalD<bestDist){bestDist=totalD;bestHwy=hwyKey;}
+    }
+    const si=nearestIC(bestHwy,startCoord.lat,startCoord.lon);
+    const ei=nearestIC(bestHwy,endCoord.lat,endCoord.lon);
+    // 確保起點 < 終點（依index方向）
+    segments.push({id:Date.now(),hwy:bestHwy,si:Math.min(si,ei),ei:Math.max(si,ei)});
+  } else {
+    // 無座標備援：依距離猜
+    const entries=HWY.N1.entries;
+    let best=1,bestDiff=Infinity;
+    for(let i=1;i<entries.length;i++){
+      const diff=Math.abs(entries[i].km-entries[0].km-totalKm);
+      if(diff<bestDiff){bestDiff=diff;best=i;}
+    }
+    segments.push({id:Date.now(),hwy:'N1',si:0,ei:best});
+  }
+  renderSegments();
+}
+
+function addSegment(){segments.push({id:Date.now(),hwy:'N1',si:0,ei:5});renderSegments();}
+function removeSegment(id){segments=segments.filter(s=>s.id!==id);renderSegments();}
+function onHwyChange(id,hwy){const s=segments.find(x=>x.id===id);if(s){s.hwy=hwy;s.si=0;s.ei=1;renderSegments();}}
+function onSiChange(id,v){const s=segments.find(x=>x.id===id);if(s){s.si=+v;refreshKm(id);}}
+function onEiChange(id,v){const s=segments.find(x=>x.id===id);if(s){s.ei=+v;refreshKm(id);}}
+function refreshKm(id){
+  const s=segments.find(x=>x.id===id);if(!s)return;
+  const km=segKm(s);
+  const el=document.getElementById('sk-'+id);
+  if(el) el.textContent=km.toFixed(1)+' km';
+}
+function segKm(seg){
+  const e=HWY[seg.hwy]?.entries;
+  if(!e)return 0;
+  return Math.abs((e[seg.ei]?.km||0)-(e[seg.si]?.km||0));
+}
+function buildOpts(hwyKey,sel){
+  return HWY[hwyKey].entries.map((e,i)=>`<option value="${i}" ${i==sel?'selected':''}>${e.n}</option>`).join('');
+}
+function renderSegments(){
+  const list=document.getElementById('seg-list');
+  if(!segments.length){
+    list.innerHTML='<p style="font-size:12px;color:var(--ink-light)">尚未設定路段</p>';return;
+  }
+  list.innerHTML=segments.map((seg,i)=>{
+    const km=segKm(seg);
+    const hwyOpts=Object.entries(HWY).map(([k,v])=>
+      `<option value="${k}" ${k===seg.hwy?'selected':''}>${v.label}</option>`).join('');
+    return `<div class="seg-card" id="sc-${seg.id}">
+      <div class="seg-card-head">
+        <span class="seg-num">路段 ${i+1}</span>
+        <div class="hwy-select-wrap" style="flex:1;margin:0 8px 0 6px">
+          <select onchange="onHwyChange(${seg.id},this.value)">${hwyOpts}</select>
+        </div>
+        <span class="seg-km" id="sk-${seg.id}">${km.toFixed(1)} km</span>
+        ${segments.length>1?`<button class="seg-remove" onclick="removeSegment(${seg.id})">×</button>`:''}
+      </div>
+      <div class="seg-selects">
+        <select onchange="onSiChange(${seg.id},this.value)">${buildOpts(seg.hwy,seg.si)}</select>
+        <span class="seg-arrow">→</span>
+        <select onchange="onEiChange(${seg.id},this.value)">${buildOpts(seg.hwy,seg.ei)}</select>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── OIL PRICE ────────────────────────────────────────────
+let oilPrice = 33.9;
+
+// ── 油價資料（從 oil_prices.json 讀取）────────────────────
+let oilPriceCache = null; // {prices: {"2026-04-06": 28.3, ...}}
+
+async function loadOilPriceCache() {
+  if(oilPriceCache) return oilPriceCache;
+  try {
+    // 從同目錄讀取 oil_prices.json
+    const res = await fetch('./oil_prices.json?t=' + Date.now());
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    oilPriceCache = await res.json();
+    console.log('油價資料載入成功，共', Object.keys(oilPriceCache.prices).length, '週');
+    return oilPriceCache;
+  } catch(e) {
+    console.warn('油價資料載入失敗:', e.message);
+    return null;
+  }
+}
+
+async function fetchOilByDate(dateStr) {
+  if(!dateStr) return;
+  const hint = document.getElementById('oil-src-hint');
+  const input = document.getElementById('manual-oil');
+  hint.textContent = '查詢中…';
+
+  const d = new Date(dateStr);
+
+  try {
+    const cache = await loadOilPriceCache();
+    if(!cache || !cache.prices) throw new Error('無油價資料');
+
+    const prices = cache.prices;
+    const dates = Object.keys(prices).sort();
+
+    // 找最接近且 <= 指定日期的那週
+    let bestDate = null;
+    for(const dt of dates) {
+      if(dt <= dateStr) bestDate = dt;
+      else break;
+    }
+
+    if(!bestDate) throw new Error('日期超出資料範圍');
+
+    const price = prices[bestDate];
+    // 計算是否為同一週（中油每週一調價）
+    const dayDiff = Math.round((d - new Date(bestDate)) / 86400000);
+    const weekNote = dayDiff === 0 ? '當日' : `${bestDate} 當週`;
+    setOilPrice(price, `中油 ${weekNote}（95無鉛）`);
+
+  } catch(err) {
+    console.warn('油價查詢失敗:', err.message);
+    hint.textContent = '⚠️ 查詢失敗，請手動輸入當日油價';
+    input.placeholder = '請手動輸入';
+    input.value = '';
+  }
+}
+
+
+function setOilPrice(price, source) {
+  oilPrice = price;
+  const input = document.getElementById('manual-oil');
+  const hint = document.getElementById('oil-src-hint');
+  input.value = price.toFixed(1);
+  input.placeholder = '';
+  hint.textContent = `✓ ${source}，可手動修改`;
+  // 同步更新 header 顯示
+  document.getElementById('oil-display').textContent = price.toFixed(1);
+  document.getElementById('oil-pulse').style.background = '#4ecb71';
+}
+
+// 從 oil_prices.json 讀取本週油價顯示在 header
+async function fetchOil(){
+  try {
+    const cache = await loadOilPriceCache();
+    if(!cache || !cache.prices) throw new Error('無資料');
+
+    const prices = cache.prices;
+    const today = new Date().toISOString().slice(0,10);
+    const dates = Object.keys(prices).sort();
+
+    // 找今日或最近一週的油價
+    let bestDate = dates[dates.length - 1]; // 預設最新
+    for(const dt of dates) {
+      if(dt <= today) bestDate = dt;
+    }
+
+    oilPrice = prices[bestDate];
+    document.getElementById('oil-display').textContent = oilPrice.toFixed(1);
+    document.getElementById('oil-pulse').style.background = '#4ecb71';
+    document.getElementById('oil-pulse').title = `資料來源：中油歷史油價（${bestDate}週）`;
+
+  } catch(e) {
+    // 失敗時顯示預設值
+    document.getElementById('oil-display').textContent = oilPrice.toFixed(1);
+    document.getElementById('oil-pulse').style.background = '#e0a030';
+    document.getElementById('oil-pulse').title = '油價資料載入失敗，請手動輸入';
+  }
+}
+
+// ── TOLL ─────────────────────────────────────────────────
+function calcToll(km){
+  if(km<=20) return 0;
+  const raw=km<=200?(km-20)*1.20:(180*1.20+(km-200)*0.90);
+  return Math.round(raw*0.9);
+}
+
+// ── CALCULATE ────────────────────────────────────────────
+function calculate(){
+  if(!segments.length){showToast('請先設定至少一個路段');return;}
+  const manOil=parseFloat(document.getElementById('manual-oil').value);
+  const oil=(!isNaN(manOil)&&manOil>0)?manOil:oilPrice;
+  if(isNaN(manOil)||manOil<=0){showToast('請選擇出發日期或手動輸入油價');return;}
+  const cars=Math.max(1,parseInt(document.getElementById('num-cars').value)||1);
+  // 乘客數（不含駕駛），費用由乘客均攤，駕駛不分攤
+  const goPassengers=parseInt(document.getElementById('go-pax').value)||0;
+  const hasReturn=document.getElementById('has-return').checked;
+  const retPassengers=hasReturn?(parseInt(document.getElementById('return-pax').value)||0):0;
+
+  // 通行費距離：交流道里程差（計費依據）
+  let tollKm=0;
+  const details=[];
+  for(const seg of segments){
+    const km=segKm(seg);
+    if(km<=0){showToast('某段路段起終點相同，請確認設定');return;}
+    const e=HWY[seg.hwy].entries;
+    details.push({lbl:`${HWY[seg.hwy].label}　${e[seg.si].n} → ${e[seg.ei].n}`,km});
+    tollKm+=km;
+  }
+
+  // 油費距離：OSRM 實際行駛距離（含上下交流道的市區路段）
+  const fuelKm = osrmKm || tollKm; // 若尚未查詢路線則用交流道距離代替
+  const fuel=(fuelKm/10)*oil;
+  const toll=calcToll(tollKm);
+  const oneWay=(fuel+toll)*cars;
+  // 乘客0人時不做除法，顯示總費用供駕駛參考
+  const goPer  = goPassengers  > 0 ? Math.ceil(oneWay/goPassengers)  : oneWay;
+  const retPer = retPassengers > 0 ? Math.ceil(oneWay/retPassengers) : oneWay;
+
+  const fmt=n=>n.toLocaleString();
+
+  // 填入參數摘要卡
+  document.getElementById('rp-cars').textContent = cars;
+  document.getElementById('rp-oil').textContent = oil.toFixed(1);
+  document.getElementById('rp-go').textContent = goPassengers > 0 ? goPassengers : '僅駕駛';
+  const retWrap = document.getElementById('rp-ret-wrap');
+  if(hasReturn){
+    retWrap.style.display = 'flex';
+    document.getElementById('rp-ret').textContent = retPassengers > 0 ? retPassengers : '僅駕駛';
+  } else {
+    retWrap.style.display = 'none';
+  }
+  document.getElementById('r-dist').textContent=fuelKm.toFixed(1);
+  document.getElementById('r-fuel').textContent=fmt(Math.round(fuel*cars));
+  document.getElementById('r-toll').textContent=fmt(toll*cars);
+  document.getElementById('r-oneway').textContent=fmt(Math.round(oneWay));
+  document.getElementById('r-go-per').textContent=fmt(goPer);
+
+
+  // 回程顯示
+  const retCard=document.getElementById('r-ret-card');
+  const rtCard=document.getElementById('r-roundtrip-card');
+  if(hasReturn){
+    document.getElementById('r-ret-per').textContent=fmt(retPer);
+    document.getElementById('r-ret-note').textContent=
+      retPassengers===0?`僅駕駛，以上為總費用`:`${retPassengers} 位乘客均攤 × ${cars} 車`;
+    document.getElementById('r-roundtrip').textContent=fmt(goPer+retPer);
+    document.getElementById('r-rt-note').textContent=`去程 ${fmt(goPer)} + 回程 ${fmt(retPer)}`;
+    retCard.style.display='block';
+    rtCard.style.display='flex';
+  } else {
+    retCard.style.display='none';
+    rtCard.style.display='none';
+  }
+
+  let bd='';
+  details.forEach((d,i)=>bd+=`<div class="bd-row"><span>路段${i+1}：${d.lbl}</span><span class="bd-val">${d.km.toFixed(1)} km</span></div>`);
+  bd+=`<div class="bd-row"><span>行駛距離（油費用）</span><span class="bd-val">${fuelKm.toFixed(1)} km</span></div>`;
+  bd+=`<div class="bd-row"><span>國道計費距離（通行費用）</span><span class="bd-val">${tollKm.toFixed(1)} km</span></div>`;
+  bd+=`<div class="bd-row"><span>油價（95無鉛）</span><span class="bd-val">${oil.toFixed(1)} 元/L</span></div>`;
+  bd+=`<div class="bd-row"><span>油費（${fuelKm.toFixed(1)}km ÷ 10 × ${oil.toFixed(1)}元）× ${cars}車</span><span class="bd-val">${fmt(Math.round(fuel*cars))} 元</span></div>`;
+  const tn=tollKm<=20?'20km內免費':tollKm<=200?`(${tollKm.toFixed(1)}-20)×1.2×0.9折`:`(180×1.2+(${tollKm.toFixed(1)}-200)×0.9)×0.9折`;
+  bd+=`<div class="bd-row"><span>eTag通行費（${tn}）× ${cars}車</span><span class="bd-val">${fmt(toll*cars)} 元</span></div>`;
+  bd+=`<div class="bd-row"><span>單程合計</span><span class="bd-val">${fmt(Math.round(oneWay))} 元</span></div>`;
+  bd+=`<div class="bd-row"><span>${goPassengers>0?'去程均攤 ÷ '+goPassengers+'位乘客':'去程總費用（僅駕駛）'}</span><span class="bd-val">${fmt(goPer)} 元</span></div>`;
+  if(hasReturn) bd+=`<div class="bd-row"><span>${retPassengers>0?'回程均攤 ÷ '+retPassengers+'位乘客':'回程總費用（僅駕駛）'}</span><span class="bd-val">${fmt(retPer)} 元</span></div>`;
+  document.getElementById('bd-content').innerHTML=bd;
+
+  document.getElementById('result-panel').classList.add('visible');
+  document.getElementById('result-panel').scrollIntoView({behavior:'smooth'});
+}
+
+// ── TOGGLE RETURN ────────────────────────────────────────
+function toggleReturn(checked){
+  document.getElementById('return-section').style.display = checked ? 'block' : 'none';
+}
+
+// ── TOAST ────────────────────────────────────────────────
+let toastT;
+function showToast(msg,ok=false){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.style.background=ok?'#1a6b3c':'#c0392b';
+  t.classList.add('show');
+  clearTimeout(toastT);
+  toastT=setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+// ── INIT ─────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded',()=>{
+  renderSegments();
+  fetchOil();
+  // 設定預設日期為今天並查詢油價
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth()+1).padStart(2,'0');
+  const dd = String(today.getDate()).padStart(2,'0');
+  const todayStr = `${yyyy}-${mm}-${dd}`;
+  document.getElementById('trip-date').value = todayStr;
+  fetchOilByDate(todayStr);
+  // 顯示今日已用量
+  const initUsed = getUsage();
+  if(initUsed > 0) showUsageBadge(initUsed);
+  ['addr-start','addr-end'].forEach(id=>{
+    document.getElementById(id).addEventListener('keydown',e=>{
+      if(e.key==='Enter') findRoute();
+    });
+  });
+  loadLeaflet(()=>initMap());
+});
+</script>
+</body>
+</html>
