@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 每週自動抓取中油95無鉛汽油歷史油價
-來源：https://www.cpc.com.tw/cp.aspx?n=92
+來源：中油官方 XML Web Service
 輸出：oil_prices.json
 """
 
@@ -18,60 +18,82 @@ except ImportError:
     subprocess.check_call([sys.executable, '-m', 'pip', 'install', 'requests'])
     import requests
 
-def fetch_oil_prices():
-    url = 'https://www.cpc.com.tw/cp.aspx?n=92'
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'zh-TW,zh;q=0.9',
-    }
+HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'zh-TW,zh;q=0.9',
+}
 
-    print(f"正在抓取中油油價頁面...")
-    res = requests.get(url, headers=headers, timeout=30)
-    res.raise_for_status()
-    html = res.text
-    print(f"頁面取得成功，長度 {len(html)} 字元")
+def fetch_current_price():
+    """從中油官方 XML Web Service 取得當前油價"""
+    urls = [
+        'https://vipmbr.cpc.com.tw/CPCSTN/ListPriceWebService.asmx/getCPCMainProdListPrice_XML',
+        'https://vipmember.tmtd.cpc.com.tw/opendata/ListPriceWebService.asmx/getCPCMainProdListPrice_XML',
+    ]
+    for url in urls:
+        try:
+            res = requests.get(url, headers=HEADERS, timeout=15)
+            if res.status_code == 200:
+                # XML 格式：92、95、98、柴油順序
+                prices = re.findall(r'<參考牌價>([\d.]+)</參考牌價>', res.text)
+                if not prices:
+                    # 英文版 tag
+                    prices = re.findall(r'<PRICE>([\d.]+)</PRICE>', res.text)
+                if len(prices) >= 2:
+                    price_95 = float(prices[1])
+                    if 15 < price_95 < 60:
+                        print(f"✓ 當前95無鉛油價：{price_95} 元（來源：中油XML API）")
+                        return price_95
+        except Exception as e:
+            print(f"  嘗試 {url} 失敗：{e}")
+    return None
 
-    # 解析 pieSeries JS 變數
-    m = re.search(r'pieSeries\s*=\s*(\[[\s\S]*?\]);', html)
-    if not m:
-        raise ValueError("找不到 pieSeries 變數，中油頁面結構可能已變更")
+def fetch_history_from_igcar():
+    """從 igcar.com.tw 抓取歷史油價"""
+    # igcar 提供每週油價，格式穩定
+    url = 'https://igcar.com.tw/gas/'
+    try:
+        res = requests.get(url, headers=HEADERS, timeout=15)
+        if res.status_code != 200:
+            return {}
 
-    series = json.loads(m.group(1))
-    print(f"解析成功，共 {len(series)} 週資料")
+        # 找所有週期油價：格式如 "2026/03/02 - 2026/03/08"
+        # 和對應的95油價
+        prices = {}
+        # 找日期範圍和95無鉛油價
+        blocks = re.findall(
+            r'(\d{4}/\d{2}/\d{2})\s*-\s*\d{4}/\d{2}/\d{2}.*?95[^<]*?<[^>]+>\s*([\d.]+)\s*元',
+            res.text, re.DOTALL
+        )
+        for date_str, price_str in blocks:
+            try:
+                # 轉換日期格式
+                d = datetime.strptime(date_str, '%Y/%m/%d')
+                date_key = d.strftime('%Y-%m-%d')
+                price = float(price_str)
+                if 15 < price < 60:
+                    prices[date_key] = price
+            except:
+                pass
 
-    # 轉換成 {YYYY-MM-DD: price} 格式
-    prices = {}
-    for week in series:
-        name = week.get('name', '')  # 格式：114/03/31（民國年）
-        parts = name.split('/')
-        if len(parts) < 3:
-            continue
+        if prices:
+            print(f"✓ 從 igcar 取得 {len(prices)} 週歷史油價")
+        return prices
+    except Exception as e:
+        print(f"igcar 失敗：{e}")
+        return {}
 
-        # 民國年轉西元
-        roc_year = int(parts[0])
-        western_year = roc_year + 1911
-        month = int(parts[1])
-        day = int(parts[2])
-        date_str = f"{western_year}-{month:02d}-{day:02d}"
-
-        # 找 95 無鉛汽油
-        item95 = next((x for x in week.get('data', []) if '95' in x.get('name', '')), None)
-        if item95 and item95.get('y'):
-            prices[date_str] = item95['y']
-
-    print(f"共解析 {len(prices)} 週油價")
-    if prices:
-        sorted_dates = sorted(prices.keys())
-        print(f"最早：{sorted_dates[0]} = {prices[sorted_dates[0]]} 元")
-        print(f"最新：{sorted_dates[-1]} = {prices[sorted_dates[-1]]} 元")
-
-    return prices
+def get_this_monday():
+    """取得本週一的日期"""
+    today = datetime.now()
+    days_since_monday = today.weekday()
+    monday = today - timedelta(days=days_since_monday)
+    return monday.strftime('%Y-%m-%d')
 
 def main():
     output_path = Path(__file__).parent.parent / 'oil_prices.json'
 
-    # 讀取現有資料（如果有）
+    # 讀取現有資料
     existing = {}
     if output_path.exists():
         with open(output_path, 'r', encoding='utf-8') as f:
@@ -79,17 +101,31 @@ def main():
             existing = data.get('prices', {})
         print(f"現有資料：{len(existing)} 週")
 
-    # 抓取新資料
-    new_prices = fetch_oil_prices()
+    # 取得當前油價
+    current_price = fetch_current_price()
 
-    # 合併（新資料優先）
-    merged = {**existing, **new_prices}
+    # 取得歷史油價
+    history = fetch_history_from_igcar()
 
-    # 只保留近兩年內的資料（避免檔案過大）
+    # 合併資料
+    merged = {**existing, **history}
+
+    # 加入本週油價（用當前 API 確保準確）
+    if current_price:
+        monday = get_this_monday()
+        merged[monday] = current_price
+        print(f"✓ 本週（{monday}）油價：{current_price} 元")
+
+    if not merged:
+        print("✗ 所有來源均失敗，保留現有資料")
+        if not existing:
+            sys.exit(1)
+        merged = existing
+
+    # 只保留近兩年
     cutoff = (datetime.now() - timedelta(days=730)).strftime('%Y-%m-%d')
     merged = {k: v for k, v in merged.items() if k >= cutoff}
 
-    # 寫出 JSON
     output = {
         "updated_at": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         "source": "台灣中油 95無鉛汽油每週參考零售價",
@@ -101,7 +137,9 @@ def main():
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(output, f, ensure_ascii=False, indent=2)
 
-    print(f"\n✓ 已寫出 {output_path}，共 {len(merged)} 週資料")
+    sorted_dates = sorted(merged.keys())
+    print(f"\n✓ 已寫出 {output_path}")
+    print(f"  共 {len(merged)} 週，最新：{sorted_dates[-1]} = {merged[sorted_dates[-1]]} 元")
 
 if __name__ == '__main__':
     main()
