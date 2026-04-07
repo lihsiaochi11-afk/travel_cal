@@ -20,9 +20,4 @@
 - 從中油官網抓取最新油價，更新 `oil_prices.json`
 - 可手動觸發：Actions → 每週自動更新油價 → Run workflow
 
-## 在 index.html 填入 API Key
-找到第 472 行：
-```javascript
-const GOOGLE_API_KEY = 'YOUR_API_KEY_HERE';
-```
-換成你的 Google Geocoding API Key。
+
