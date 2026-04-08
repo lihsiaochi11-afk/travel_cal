@@ -534,7 +534,8 @@ async function nominatim(q){
 // ═══════════════════════════════════════════
 // GOOGLE GEOCODING — 填入你的 API Key
 // ═══════════════════════════════════════════
-const GOOGLE_API_KEY = 'YOUR_API_KEY_HERE'; // ← 填入 API Key
+const GOOGLE_API_KEY = 'YOUR_API_KEY_HERE'; // 已移至 Cloudflare Worker，此變數保留備用
+const GEOCODE_WORKER_URL = 'https://geocode-proxy.lihsiaochi11.workers.dev'; // ← 填入 API Key
 
 // 每日用量控制
 const DAILY_LIMIT  = 50;  // 每日最多幾次 Google Geocoding
@@ -581,9 +582,7 @@ async function googleGeocode(q){
   }
 
   try{
-    const url = `https://maps.googleapis.com/maps/api/geocode/json`+
-                `?address=${encodeURIComponent(q+', 台灣')}`+
-                `&language=zh-TW&region=TW&key=${GOOGLE_API_KEY}`;
+    const url = `${GEOCODE_WORKER_URL}?address=${encodeURIComponent(q+', 台灣')}`;
     const res  = await fetch(url);
     const data = await res.json();
 
