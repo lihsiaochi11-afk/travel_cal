@@ -1092,8 +1092,6 @@ function calculate(){
   const rtCard=document.getElementById('r-roundtrip-card');
   if(hasReturn){
     document.getElementById('r-ret-per').textContent=fmt(retPer);
-    document.getElementById('r-ret-note').textContent=
-      retPassengers===0?`僅駕駛，以上為總費用`:`${retPassengers} 位乘客均攤 × ${cars} 車`;
     document.getElementById('r-roundtrip').textContent=fmt(goPer+retPer);
     document.getElementById('r-rt-note').textContent=`去程 ${fmt(goPer)} + 回程 ${fmt(retPer)}`;
     retCard.style.display='block';
