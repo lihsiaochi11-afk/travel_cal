@@ -573,7 +573,7 @@ function showUsageBadge(used){
 
 // Google Geocoding API
 async function googleGeocode(q){
-  if(!GOOGLE_API_KEY || GOOGLE_API_KEY === 'YOUR_API_KEY_HERE') return null;
+  if(!GEOCODE_WORKER_URL) return null; // 改走 Worker，不需要檢查 API Key
 
   const used = getUsage();
   if(used >= DAILY_LIMIT){
