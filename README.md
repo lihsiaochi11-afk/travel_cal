@@ -10,10 +10,6 @@
     └── update_oil.yml                  # 每週自動更新排程
 ```
 
-## 部署到 GitHub Pages
-1. 建立 repository，上傳所有檔案
-2. Settings → Pages → Source 選 `main` branch
-3. 等待部署完成，取得網址
 
 ## 油價自動更新
 - GitHub Actions 每週日 16:30 UTC（台灣週一 00:30）自動執行
